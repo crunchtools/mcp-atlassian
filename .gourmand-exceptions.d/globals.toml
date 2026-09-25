@@ -1,0 +1,47 @@
+# Gourmand global exclusions. See gourmand.toml for the fork policy (RT #1511):
+# upstream-owned paths are excluded; Gourmand gates only the Crunchtools delta.
+# Revisit on every upstream sync.
+
+[global]
+excluded_paths = [
+    ".git/**",
+    ".venv/**",
+    ".mypy_cache/**",
+    ".ruff_cache/**",
+    ".pytest_cache/**",
+    "*.egg-info/**",
+    "dist/**",
+    "build/**",
+    # --- upstream-owned (sooperset/mcp-atlassian) ---
+    "src/**",
+    "tests/**",
+    "scripts/**",
+    "docs/**",
+    "helm/**",
+    ".claude/**",
+    ".devcontainer/**",
+    ".github/ISSUE_TEMPLATE/**",
+    ".github/copilot-instructions.md",
+    ".github/FUNDING.yml",
+    ".github/pull_request_template.md",
+    ".github/workflows/claude.yml",
+    ".github/workflows/lint.yml",
+    ".github/workflows/publish.yml",
+    ".github/workflows/stale.yml",
+    ".github/workflows/tests.yml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "CONTRIBUTING.md",
+    "Dockerfile",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md",
+    "docs.json",
+    "pyproject.toml",
+    "uv.lock",
+    "smithery.yaml",
+    ".env.example",
+    ".dockerignore",
+    ".mintignore",
+    ".worktreeinclude",
+]

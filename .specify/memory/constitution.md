@@ -1,9 +1,9 @@
 # mcp-atlassian Constitution
 
-> **Version:** 1.0.0
+> **Version:** 1.1.0
 > **Ratified:** 2026-09-20
 > **Status:** Active
-> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.4.0
+> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.17.0
 > **Profile:** Forked MCP Server
 
 ## Upstream
@@ -32,3 +32,9 @@ forked projects do not dual-push to GHCR; the GHCR mirror exists for images we
 author. This repo was flagged as a Section III gap during the RT #1480 fleet
 sweep purely because it had no profile declared, so it fell through to the
 default container-image expectations. It was exempt the whole time.
+
+## Quality Gates
+
+Gourmand gates only the Crunchtools delta (Containerfile, our workflows,
+`.specify/`, our config); upstream paths are excluded in
+`.gourmand-exceptions.d/globals.toml` and revisited on each upstream sync.

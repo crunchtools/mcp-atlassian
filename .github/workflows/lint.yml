@@ -26,6 +26,7 @@ jobs:
       - name: Run pre-commit
         uses: pre-commit/action@v3.0.0
         env:
-          # Gatehouse reviews PRs in its own workflow (gatehouse.yml); its local
-          # hook needs a developer key file that CI does not have.
-          SKIP: gatehouse
+          # Gatehouse and Gourmand run in their own workflows (gatehouse.yml,
+          # gourmand.yml); their local hooks need podman and a developer key
+          # file that this job does not have.
+          SKIP: gatehouse,gourmand
