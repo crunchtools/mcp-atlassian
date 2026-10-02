@@ -1,10 +1,17 @@
 # mcp-atlassian Constitution
 
-> **Version:** 1.1.0
+> **Version:** 1.2.0
 > **Ratified:** 2026-09-20
+> **Amended:** 2026-10-02
 > **Status:** Active
-> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.17.0
+> **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.18.0
 > **Profile:** Forked MCP Server
+
+This file holds what is specific to the crunchtools fork of mcp-atlassian. The
+fleet rules and the Forked MCP Server profile (Quay.io-only registry, minimal
+gate set, Gourmand scoped to the crunchtools delta) apply at the inherited
+version and are checked against this repo's files by `constitution.yml`. They
+are not restated here.
 
 ## Upstream
 
@@ -15,6 +22,7 @@
 ## Deployment
 
 - **Port:** 8021
+- **Image:** `quay.io/crunchtools/mcp-atlassian`
 - **Env file:** /srv/mcp-jira.crunchtools.com/config/mcp-jira.env
 - **Credentials:** JIRA_URL, JIRA_USERNAME, JIRA_API_TOKEN, ALLOW_GLOBAL_CRED_FALLBACK, TOOLSETS
 
@@ -25,16 +33,10 @@
 - Proxy routing preserved for trusted transports
 - Rate-limit tests made deterministic against a shared bucket
 
-## Registry
+## History
 
-Quay.io only — `quay.io/crunchtools/mcp-atlassian`. Per constitution Section III,
-forked projects do not dual-push to GHCR; the GHCR mirror exists for images we
-author. This repo was flagged as a Section III gap during the RT #1480 fleet
-sweep purely because it had no profile declared, so it fell through to the
-default container-image expectations. It was exempt the whole time.
-
-## Quality Gates
-
-Gourmand gates only the Crunchtools delta (Containerfile, our workflows,
-`.specify/`, our config); upstream paths are excluded in
-`.gourmand-exceptions.d/globals.toml` and revisited on each upstream sync.
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-09-20 | Forked MCP Server profile declared |
+| 1.1.0 | 2026-09-25 | Gourmand gates the crunchtools delta (RT #1511) |
+| 1.2.0 | 2026-10-02 | Manifest under constitution v1.18.0: Registry and Quality Gates restatements removed |

@@ -20,5 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Per-repo constitution now inherits crunchtools/constitution v1.17.0.
+- Per-repo constitution is now a v1.18.0 manifest: only fork-specific facts
+  (upstream, deployment, patches); fleet and profile rules apply by reference.
+- Constitution validation pinned to v1.18.0 via `constitution.yml`.
+- Dependabot auto-merges GitHub Actions minor and patch updates.
 - Synced with upstream v0.22.1.
