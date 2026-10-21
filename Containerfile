@@ -8,7 +8,7 @@
 #   podman run --env-file ~/.config/mcp-env/mcp-atlassian.env \
 #     -p 127.0.0.1:8015:8000 quay.io/crunchtools/mcp-atlassian
 
-FROM quay.io/hummingbird/python:latest-builder AS builder
+FROM quay.io/hummingbird/python:3.14-builder AS builder
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ COPY src/ ./src/
 RUN python3 -m venv /app/venv
 RUN /app/venv/bin/pip install --no-cache-dir .
 
-FROM quay.io/hummingbird/python:latest
+FROM quay.io/hummingbird/python:3.14
 
 LABEL name="mcp-atlassian" \
       summary="MCP server for Atlassian Jira and Confluence" \
