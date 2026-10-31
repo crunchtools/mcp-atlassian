@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Upgraded locked dependencies within their declared ranges to clear the
+  advisories the fleet dependency audit found (26 of 28 flagged packages; fastmcp 2.14 needs a 3.2 port and diskcache has no fixed release).
+
 ### Added
 
 - Gourmand CI workflow and pre-commit hook, scoped to the Crunchtools delta;
