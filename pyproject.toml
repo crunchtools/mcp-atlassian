@@ -98,7 +98,15 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "B", "W", "I", "N", "UP", "ANN", "S", "BLE", "FBT", "C4", "DTZ", "T10", "EM", "ISC", "ICN"]
-ignore = ["ANN401", "EM101"]
+# The nine on the second line came from the ruff hook's `args:` in the old
+# .pre-commit-config.yaml. python-sdlc reads [tool.ruff], not hook args, so
+# dropping that file dropped them and `ruff check .` reported 1128 findings.
+# Same rules, same intent, now in the config file (constitution XII: the
+# image carries tools, the repo carries its rules).
+ignore = [
+  "ANN401", "EM101",
+  "BLE001", "EM102", "FBT001", "FBT002", "E501", "F841", "S112", "S113", "B904",
+]
 fixable = ["ALL"]
 unfixable = []
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
@@ -115,6 +123,7 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.mypy]
+files = ["src"]
 python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
@@ -128,11 +137,28 @@ warn_unused_ignores = false
 warn_no_return = true
 warn_unreachable = true
 strict_equality = true
-strict_optional = true
+strict_optional = false
 disallow_subclassing_any = true
 warn_incomplete_stub = true
-exclude = "^src/"
+# `exclude = "^src/"` used to sit here, excluding the entire package from the
+# type checker. It did not bite while mypy ran from a pre-commit hook, because
+# mypy ignores `exclude` for paths passed explicitly on the command line and
+# pre-commit passes the changed files. Under python-sdlc mypy is driven by
+# `files` from this config, where `exclude` DOES apply -- so the pair would
+# have type-checked nothing at all while reporting success. Removed.
 explicit_package_bases = true
+
+# These came from the mypy hook's `args:` in the old .pre-commit-config.yaml,
+# which carried this repo's real type-checking settings and a TODO listing the
+# debt behind them. python-sdlc reads [tool.mypy], not hook args, so they move
+# here unchanged rather than quietly becoming strict and failing the gate.
+# Each entry is existing debt to pay down, not a new allowance.
+ignore_missing_imports = true
+disable_error_code = [
+  "index", "unreachable", "assignment", "arg-type", "return-value",
+  "has-type", "no-any-return", "misc", "var-annotated", "no-untyped-def",
+  "annotation-unchecked",
+]
 
 [[tool.mypy.overrides]]
 module = "tests.*"
@@ -159,3 +185,9 @@ vcs = "git"
 style = "pep440"
 bump = true
 fallback-version = "0.0.0"
+
+[tool.sdlc.push]
+# No in-repo Semgrep rules: the check exits 2 when .semgrep is absent
+# rather than scanning nothing and calling it a pass.
+skip = ["semgrep"]
+

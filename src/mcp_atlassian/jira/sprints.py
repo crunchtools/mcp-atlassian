@@ -1,6 +1,6 @@
 """Module for Jira sprints operations."""
 
-import datetime
+import datetime as dt
 import logging
 from typing import Any
 
@@ -200,8 +200,8 @@ class SprintsMixin(JiraClient):
 
         # validate start date is not in the past
         if parsed_start_date.tzinfo is None:
-            parsed_start_date = parsed_start_date.replace(tzinfo=datetime.timezone.utc)
-        if parsed_start_date < datetime.datetime.now(datetime.timezone.utc):
+            parsed_start_date = parsed_start_date.replace(tzinfo=dt.timezone.utc)
+        if parsed_start_date < dt.datetime.now(dt.timezone.utc):
             raise ValueError("Start date cannot be in the past.")
 
         # validate end date format
