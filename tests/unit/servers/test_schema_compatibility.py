@@ -25,19 +25,21 @@ from mcp_atlassian.servers.main import _sanitize_schema_for_compatibility, main_
 def all_tool_schemas() -> dict[str, dict]:
     """Load and sanitize all tool schemas from both Jira and Confluence servers.
 
-    Uses ``main_mcp.get_tools()`` to get prefixed tool names (e.g.,
+    Uses ``main_mcp.list_tools()`` to get prefixed tool names (e.g.,
     ``jira_get_issue``, ``confluence_get_page``) and applies the same
     ``_sanitize_schema_for_compatibility`` transform that the production
-    ``_list_tools_mcp`` method uses.  No Atlassian credentials are needed
+    tools/list middleware uses.  No Atlassian credentials are needed
     since we only inspect schemas, not invoke tools.
     """
     import asyncio
 
     async def _load() -> dict[str, dict]:
-        tools = await main_mcp.get_tools()
+        tools = await main_mcp.list_tools(run_middleware=False)
         schemas: dict[str, dict] = {}
-        for name, tool_obj in tools.items():
-            mcp_tool = tool_obj.to_mcp_tool(name=name)
+        for tool_obj in tools:
+            name = tool_obj.name
+            # Deep copy: to_mcp_tool shares the live registry's schema dict.
+            mcp_tool = tool_obj.to_mcp_tool(name=name).model_copy(deep=True)
             _sanitize_schema_for_compatibility(mcp_tool)
             schemas[name] = mcp_tool.inputSchema
         return schemas
@@ -63,8 +65,8 @@ def _get_tool_names() -> list[str]:
     import asyncio
 
     async def _load() -> list[str]:
-        tools = await main_mcp.get_tools()
-        return sorted(tools.keys())
+        tools = await main_mcp.list_tools(run_middleware=False)
+        return sorted(t.name for t in tools)
 
     # Use asyncio.run() which creates a fresh event loop
     # This is safe at collection time (before any test event loop exists)
@@ -183,6 +185,55 @@ class TestSanitizeSchemaForCompatibility:
         assert "anyOf" not in prop
         assert prop["default"] is None
         assert prop["description"] == "test"
+
+    def test_flattens_doubly_wrapped_nullable_string(self) -> None:
+        """Python 3.10's extra Optional around ``Annotated[str | None, Field()]``
+        unwraps to the inner Field schema, then flattens."""
+        tool = self._make_tool(
+            {
+                "foo": {
+                    "anyOf": [
+                        {
+                            "anyOf": [{"type": "string"}, {"type": "null"}],
+                            "default": None,
+                            "description": "from Field",
+                        },
+                        {"type": "null"},
+                    ],
+                    "default": None,
+                    "description": "from docstring",
+                }
+            }
+        )
+        _sanitize_schema_for_compatibility(tool)
+        assert tool.inputSchema["properties"]["foo"] == {
+            "type": "string",
+            "default": None,
+            "description": "from Field",
+        }
+
+    def test_doubly_wrapped_keeps_signature_default(self) -> None:
+        """A default on the signature survives when Field() has none."""
+        tool = self._make_tool(
+            {
+                "foo": {
+                    "anyOf": [
+                        {
+                            "anyOf": [{"type": "boolean"}, {"type": "null"}],
+                            "description": "from Field",
+                        },
+                        {"type": "null"},
+                    ],
+                    "default": None,
+                }
+            }
+        )
+        _sanitize_schema_for_compatibility(tool)
+        assert tool.inputSchema["properties"]["foo"] == {
+            "type": "boolean",
+            "default": None,
+            "description": "from Field",
+        }
 
     def test_flattens_simple_nullable_integer(self) -> None:
         """``int | None`` → ``{"type": "integer"}``."""
@@ -354,3 +405,26 @@ class TestNarrowedParameterRegression:
         csv = "./file1.pdf, ./file2.png"
         result = [p.strip() for p in csv.split(",") if p.strip()]
         assert result == ["./file1.pdf", "./file2.png"]
+
+
+@pytest.mark.anyio
+async def test_wire_schemas_match_sanitized_schemas(
+    all_tool_schemas: dict[str, dict], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """tools/list over a real client session serves exactly the schemas these
+    tests check, so the production middleware path is covered too."""
+    from fastmcp import Client
+
+    monkeypatch.setenv("JIRA_URL", "https://example.atlassian.net")
+    monkeypatch.setenv("JIRA_USERNAME", "user@example.com")
+    monkeypatch.setenv("JIRA_API_TOKEN", "x")
+    monkeypatch.setenv("CONFLUENCE_URL", "https://example.atlassian.net/wiki")
+    monkeypatch.setenv("CONFLUENCE_USERNAME", "user@example.com")
+    monkeypatch.setenv("CONFLUENCE_API_TOKEN", "x")
+    for var in ("READ_ONLY_MODE", "ENABLED_TOOLS", "TOOLSETS"):
+        monkeypatch.delenv(var, raising=False)
+
+    async with Client(main_mcp) as client:
+        wire = {tool.name: tool.inputSchema for tool in await client.list_tools()}
+
+    assert wire == all_tool_schemas

@@ -1,21 +1,26 @@
 """Main FastMCP server setup for Atlassian integration."""
 
 import base64
+import copy
 import json
 import logging
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from typing import Any, Literal, Optional
 from urllib.parse import urlparse
 
+import mcp.types
 from cachetools import TTLCache
 from fastmcp import FastMCP
 from fastmcp import settings as fastmcp_settings
 from fastmcp.exceptions import NotFoundError
 from fastmcp.server.event_store import EventStore
-from fastmcp.server.http import StarletteWithLifespan
+from fastmcp.server.http import HostOriginProtection, StarletteWithLifespan
+from fastmcp.server.middleware import CallNext, MiddlewareContext
+from fastmcp.server.middleware import Middleware as FastMCPMiddleware
 from fastmcp.tools import Tool as FastMCPTool
+from fastmcp.tools.base import ToolResult
 from mcp.types import Tool as MCPTool
 from starlette.middleware import Middleware
 from starlette.requests import Request
@@ -86,13 +91,19 @@ def _sanitize_schema_for_compatibility(tool: MCPTool) -> MCPTool:
     Returns:
         The same MCPTool instance (mutated) for chaining convenience.
     """
-    schema = tool.inputSchema
+    _sanitize_schema_parameters(tool.inputSchema)
+    return tool
+
+
+def _sanitize_schema_parameters(schema: dict[str, Any] | None) -> None:
+    """Apply the ``_sanitize_schema_for_compatibility`` transform to a schema
+    dict in place."""
     if not schema or not isinstance(schema, dict):
-        return tool
+        return
 
     properties = schema.get("properties")
     if not properties or not isinstance(properties, dict):
-        return tool
+        return
 
     for _prop_name, prop_def in properties.items():
         if not isinstance(prop_def, dict):
@@ -102,17 +113,31 @@ def _sanitize_schema_for_compatibility(tool: MCPTool) -> MCPTool:
         if not any_of or not isinstance(any_of, list):
             continue
 
-        # Only flatten simple nullable unions: [{"type": T}, {"type": "null"}]
         non_null = [v for v in any_of if v != {"type": "null"}]
         null_present = any(v == {"type": "null"} for v in any_of)
 
+        # Python 3.10 wraps ``Annotated[T | None, Field(...)] = None`` in a second
+        # Optional, nesting the Field's schema inside another nullable union.
+        # Unwrap to the inner schema, as later Pythons generate it; the outer
+        # wrapper still carries the signature's default when Field has none.
+        if (
+            null_present
+            and len(non_null) == 1
+            and isinstance(non_null[0].get("anyOf"), list)
+        ):
+            inner = non_null[0]
+            prop_def.pop("anyOf")
+            prop_def.update(inner)
+            any_of = prop_def["anyOf"]
+            non_null = [v for v in any_of if v != {"type": "null"}]
+            null_present = any(v == {"type": "null"} for v in any_of)
+
+        # Only flatten simple nullable unions: [{"type": T}, {"type": "null"}]
         if null_present and len(non_null) == 1 and "type" in non_null[0]:
             # Collapse: pull the real type up, drop anyOf
             resolved_type = non_null[0]["type"]
             prop_def.pop("anyOf")
             prop_def["type"] = resolved_type
-
-    return tool
 
 
 async def health_check(request: Request) -> JSONResponse:
@@ -216,7 +241,10 @@ class AtlassianMCP(FastMCP[MainAppContext]):
 
         Returns None when the lifespan context is unavailable.
         """
-        req_context = self._mcp_server.request_context
+        try:
+            req_context = self._mcp_server.request_context
+        except LookupError:
+            return None
         if req_context is None or req_context.lifespan_context is None:
             return None
 
@@ -312,48 +340,50 @@ class AtlassianMCP(FastMCP[MainAppContext]):
                 return False
         return True
 
-    async def _list_tools_mcp(self) -> list[MCPTool]:
-        # Filter tools based on enabled_tools, read_only mode, and service configuration from the lifespan context.
+    async def filter_listed_tools(
+        self, tools: Sequence[FastMCPTool]
+    ) -> list[FastMCPTool]:
+        """Listing filter, with schemas sanitized for AI platform compatibility.
+
+        Hides everything when the lifespan context is unavailable.
+        """
         ctx = self._tool_filter_context()
         if ctx is None:
-            logger.warning(
-                "Lifespan context not available during _list_tools_mcp call."
-            )
+            logger.warning("Lifespan context not available during tools/list.")
             return []
 
-        all_tools: dict[str, FastMCPTool] = await self.get_tools()
-        logger.debug(
-            f"Aggregated {len(all_tools)} tools before filtering: {list(all_tools.keys())}"
-        )
-
-        filtered_tools: list[MCPTool] = []
-        for registered_name, tool_obj in all_tools.items():
-            if not self._is_tool_enabled(registered_name, tool_obj, ctx):
-                logger.debug(f"Excluding tool '{registered_name}' (filtered)")
+        filtered_tools: list[FastMCPTool] = []
+        for tool_obj in tools:
+            if not self._is_tool_enabled(tool_obj.name, tool_obj, ctx):
+                logger.debug(f"Excluding tool '{tool_obj.name}' (filtered)")
                 continue
-            mcp_tool = tool_obj.to_mcp_tool(name=registered_name)
-            _sanitize_schema_for_compatibility(mcp_tool)
-            filtered_tools.append(mcp_tool)
+            parameters = copy.deepcopy(tool_obj.parameters)
+            _sanitize_schema_parameters(parameters)
+            filtered_tools.append(
+                tool_obj.model_copy(update={"parameters": parameters})
+            )
 
-        logger.debug(
-            f"_list_tools_mcp: Total tools after filtering: {len(filtered_tools)}"
-        )
+        logger.debug(f"tools/list: Total tools after filtering: {len(filtered_tools)}")
         return filtered_tools
 
-    async def _call_tool_mcp(self, key: str, arguments: dict[str, Any]) -> Any:
-        # Enforce the same enablement filter at call time as at listing time, so a
-        # tool hidden from the listing (read-only mode, not in ENABLED_TOOLS, toolset
-        # disabled, or service unavailable) cannot be invoked directly by name.
-        # Denials look identical to an unknown tool (no exists-but-disabled leak).
+    async def authorize_tool_call(self, name: str) -> None:
+        """Enforce the listing's authorization boundaries at call time, so a tool
+        hidden from the listing (read-only mode, not in ENABLED_TOOLS, toolset
+        disabled) cannot be invoked directly by name.
+
+        Fails closed when the lifespan context is unavailable. Denials look
+        identical to an unknown tool (no exists-but-disabled leak).
+
+        Raises:
+            NotFoundError: If the call is not authorized.
+        """
         ctx = self._tool_filter_context()
-        if ctx is not None:
-            all_tools = await self.get_tools()
-            tool_obj = all_tools.get(key)
-            if tool_obj is not None and not self._is_tool_authorized(
-                key, tool_obj, ctx
-            ):
-                raise NotFoundError(f"Unknown tool: {key}")
-        return await super()._call_tool_mcp(key, arguments)
+        if ctx is None:
+            logger.warning(f"Lifespan context not available; denying '{name}'.")
+            raise NotFoundError(f"Unknown tool: {name}")
+        tool_obj = await self.get_tool(name)
+        if tool_obj is not None and not self._is_tool_authorized(name, tool_obj, ctx):
+            raise NotFoundError(f"Unknown tool: {name}")
 
     def http_app(
         self,
@@ -364,7 +394,25 @@ class AtlassianMCP(FastMCP[MainAppContext]):
         transport: Literal["http", "streamable-http", "sse"] = "streamable-http",
         event_store: EventStore | None = None,
         retry_interval: int | None = None,
+        host_origin_protection: HostOriginProtection | None = None,
+        allowed_hosts: list[str] | None = None,
+        allowed_origins: list[str] | None = None,
     ) -> StarletteWithLifespan:
+        """Build the HTTP app with UserTokenMiddleware ahead of any caller middleware.
+
+        Every other argument passes straight through to ``FastMCP.http_app``.
+        The Host/Origin guard arguments default to fastmcp's settings
+        (``FASTMCP_HTTP_HOST_ORIGIN_PROTECTION``, ``FASTMCP_HTTP_ALLOWED_HOSTS``),
+        which leave the guard off.
+
+        Args:
+            host_origin_protection: ``True`` rejects requests whose Host is not
+                allowed (421) or whose Origin is untrusted (403); ``"auto"``
+                does so only for loopback-bound servers or explicit allowlists;
+                ``False`` disables the guard.
+            allowed_hosts: Extra Host patterns the guard accepts.
+            allowed_origins: Extra browser origins the guard accepts.
+        """
         final_path = path
         if transport == "streamable-http":
             configured_path = path or fastmcp_settings.streamable_http_path
@@ -383,8 +431,34 @@ class AtlassianMCP(FastMCP[MainAppContext]):
             transport=transport,
             event_store=event_store,
             retry_interval=retry_interval,
+            host_origin_protection=host_origin_protection,
+            allowed_hosts=allowed_hosts,
+            allowed_origins=allowed_origins,
         )
         return app
+
+
+class AtlassianToolFilterMiddleware(FastMCPMiddleware):
+    """Applies AtlassianMCP's tool enablement filter to every tools/list and
+    tools/call, whichever path the request takes into the server."""
+
+    def __init__(self, server: AtlassianMCP) -> None:
+        self._server = server
+
+    async def on_list_tools(
+        self,
+        context: MiddlewareContext[mcp.types.ListToolsRequest],
+        call_next: CallNext[mcp.types.ListToolsRequest, Sequence[FastMCPTool]],
+    ) -> Sequence[FastMCPTool]:
+        return await self._server.filter_listed_tools(await call_next(context))
+
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[mcp.types.CallToolRequestParams],
+        call_next: CallNext[mcp.types.CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
+        await self._server.authorize_tool_call(context.message.name)
+        return await call_next(context)
 
 
 token_validation_cache: TTLCache[
@@ -869,8 +943,9 @@ main_mcp = AtlassianMCP(
     lifespan=main_lifespan,
     auth=_build_auth_provider(),
 )
-main_mcp.mount(jira_mcp, "jira")
-main_mcp.mount(confluence_mcp, "confluence")
+main_mcp.add_middleware(AtlassianToolFilterMiddleware(main_mcp))
+main_mcp.mount(jira_mcp, namespace="jira")
+main_mcp.mount(confluence_mcp, namespace="confluence")
 
 
 @main_mcp.custom_route("/healthz", methods=["GET"], include_in_schema=False)

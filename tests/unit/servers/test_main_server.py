@@ -84,7 +84,7 @@ async def test_run_server_invalid_transport():
 @pytest.mark.anyio
 async def test_tool_registration_issue_dates_name():
     """Ensure issue dates tool is registered with a single Jira prefix."""
-    tools = await main_mcp.get_tools()
+    tools = {t.name for t in await main_mcp.list_tools(run_middleware=False)}
     assert "jira_get_issue_dates" in tools
     assert "jira_jira_get_issue_dates" not in tools
 
@@ -775,3 +775,56 @@ class TestUserTokenMiddlewareSsrfValidation:
         middleware.app.assert_called_once()
         passed_scope = middleware.app.call_args[0][0]
         assert passed_scope["state"].get("auth_validation_error") in (None, "")
+
+
+def test_http_app_override_accepts_every_fastmcp_parameter():
+    """fastmcp's HTTP runner passes http_app() its full parameter set; an
+    override that drops one fails every HTTP start with a TypeError."""
+    import inspect
+
+    from fastmcp import FastMCP
+
+    from mcp_atlassian.servers.main import AtlassianMCP
+
+    upstream = set(inspect.signature(FastMCP.http_app).parameters)
+    ours = set(inspect.signature(AtlassianMCP.http_app).parameters)
+    assert upstream <= ours, f"missing: {sorted(upstream - ours)}"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("host", "rejected"), [("evil.example", True), ("good.example", False)]
+)
+async def test_http_app_applies_host_origin_protection(host: str, rejected: bool):
+    """host_origin_protection and allowed_hosts reach fastmcp's Host guard.
+
+    Uses a raw ASGI scope: the guard trusts scope["server"], which test
+    transports set from the request's own Host header."""
+    from mcp_atlassian.servers.main import main_mcp
+
+    app = main_mcp.http_app(host_origin_protection=True, allowed_hosts=["good.example"])
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "GET",
+        "scheme": "http",
+        "path": "/healthz",
+        "raw_path": b"/healthz",
+        "query_string": b"",
+        "headers": [(b"host", host.encode())],
+        "server": ("10.0.0.5", 8021),
+        "client": ("10.0.0.9", 50000),
+        "root_path": "",
+    }
+    sent: list[dict] = []
+
+    async def receive() -> dict:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message: dict) -> None:
+        sent.append(message)
+
+    await app(scope, receive, send)
+    status = next(m["status"] for m in sent if m["type"] == "http.response.start")
+    assert (status == 421) is rejected
