@@ -775,3 +775,17 @@ class TestUserTokenMiddlewareSsrfValidation:
         middleware.app.assert_called_once()
         passed_scope = middleware.app.call_args[0][0]
         assert passed_scope["state"].get("auth_validation_error") in (None, "")
+
+
+def test_http_app_override_accepts_every_fastmcp_parameter():
+    """fastmcp's HTTP runner passes http_app() its full parameter set; an
+    override that drops one fails every HTTP start with a TypeError."""
+    import inspect
+
+    from fastmcp import FastMCP
+
+    from mcp_atlassian.servers.main import AtlassianMCP
+
+    upstream = set(inspect.signature(FastMCP.http_app).parameters)
+    ours = set(inspect.signature(AtlassianMCP.http_app).parameters)
+    assert upstream <= ours, f"missing: {sorted(upstream - ours)}"

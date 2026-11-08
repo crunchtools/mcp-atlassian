@@ -1351,3 +1351,15 @@ class TestToolFilterMiddlewareEndToEnd:
             "jira_create_issue": "dispatched",
             "confluence_create_page": "denied",
         }
+
+    async def test_toolsets_hide_and_deny_tools_outside_enabled_toolsets(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("TOOLSETS", "jira_issues")
+        listed, outcomes = await self._session_view()
+        assert "jira_create_issue" in listed
+        assert not any(name.startswith("confluence_") for name in listed)
+        assert outcomes == {
+            "jira_create_issue": "dispatched",
+            "confluence_create_page": "denied",
+        }

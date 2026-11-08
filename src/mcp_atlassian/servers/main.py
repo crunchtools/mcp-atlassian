@@ -16,7 +16,7 @@ from fastmcp import FastMCP
 from fastmcp import settings as fastmcp_settings
 from fastmcp.exceptions import NotFoundError
 from fastmcp.server.event_store import EventStore
-from fastmcp.server.http import StarletteWithLifespan
+from fastmcp.server.http import HostOriginProtection, StarletteWithLifespan
 from fastmcp.server.middleware import CallNext, MiddlewareContext
 from fastmcp.server.middleware import Middleware as FastMCPMiddleware
 from fastmcp.tools import Tool as FastMCPTool
@@ -113,10 +113,26 @@ def _sanitize_schema_parameters(schema: dict[str, Any] | None) -> None:
         if not any_of or not isinstance(any_of, list):
             continue
 
-        # Only flatten simple nullable unions: [{"type": T}, {"type": "null"}]
         non_null = [v for v in any_of if v != {"type": "null"}]
         null_present = any(v == {"type": "null"} for v in any_of)
 
+        # Python 3.10 wraps ``Annotated[T | None, Field(...)] = None`` in a second
+        # Optional, nesting the Field's schema inside another nullable union.
+        # Unwrap to the inner schema, as later Pythons generate it; the outer
+        # wrapper still carries the signature's default when Field has none.
+        if (
+            null_present
+            and len(non_null) == 1
+            and isinstance(non_null[0].get("anyOf"), list)
+        ):
+            inner = non_null[0]
+            prop_def.pop("anyOf")
+            prop_def.update(inner)
+            any_of = prop_def["anyOf"]
+            non_null = [v for v in any_of if v != {"type": "null"}]
+            null_present = any(v == {"type": "null"} for v in any_of)
+
+        # Only flatten simple nullable unions: [{"type": T}, {"type": "null"}]
         if null_present and len(non_null) == 1 and "type" in non_null[0]:
             # Collapse: pull the real type up, drop anyOf
             resolved_type = non_null[0]["type"]
@@ -378,6 +394,9 @@ class AtlassianMCP(FastMCP[MainAppContext]):
         transport: Literal["http", "streamable-http", "sse"] = "streamable-http",
         event_store: EventStore | None = None,
         retry_interval: int | None = None,
+        host_origin_protection: HostOriginProtection | None = None,
+        allowed_hosts: list[str] | None = None,
+        allowed_origins: list[str] | None = None,
     ) -> StarletteWithLifespan:
         final_path = path
         if transport == "streamable-http":
@@ -397,6 +416,9 @@ class AtlassianMCP(FastMCP[MainAppContext]):
             transport=transport,
             event_store=event_store,
             retry_interval=retry_interval,
+            host_origin_protection=host_origin_protection,
+            allowed_hosts=allowed_hosts,
+            allowed_origins=allowed_origins,
         )
         return app
 

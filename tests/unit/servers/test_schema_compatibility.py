@@ -38,7 +38,8 @@ def all_tool_schemas() -> dict[str, dict]:
         schemas: dict[str, dict] = {}
         for tool_obj in tools:
             name = tool_obj.name
-            mcp_tool = tool_obj.to_mcp_tool(name=name)
+            # Deep copy: to_mcp_tool shares the live registry's schema dict.
+            mcp_tool = tool_obj.to_mcp_tool(name=name).model_copy(deep=True)
             _sanitize_schema_for_compatibility(mcp_tool)
             schemas[name] = mcp_tool.inputSchema
         return schemas
@@ -184,6 +185,55 @@ class TestSanitizeSchemaForCompatibility:
         assert "anyOf" not in prop
         assert prop["default"] is None
         assert prop["description"] == "test"
+
+    def test_flattens_doubly_wrapped_nullable_string(self) -> None:
+        """Python 3.10's extra Optional around ``Annotated[str | None, Field()]``
+        unwraps to the inner Field schema, then flattens."""
+        tool = self._make_tool(
+            {
+                "foo": {
+                    "anyOf": [
+                        {
+                            "anyOf": [{"type": "string"}, {"type": "null"}],
+                            "default": None,
+                            "description": "from Field",
+                        },
+                        {"type": "null"},
+                    ],
+                    "default": None,
+                    "description": "from docstring",
+                }
+            }
+        )
+        _sanitize_schema_for_compatibility(tool)
+        assert tool.inputSchema["properties"]["foo"] == {
+            "type": "string",
+            "default": None,
+            "description": "from Field",
+        }
+
+    def test_doubly_wrapped_keeps_signature_default(self) -> None:
+        """A default on the signature survives when Field() has none."""
+        tool = self._make_tool(
+            {
+                "foo": {
+                    "anyOf": [
+                        {
+                            "anyOf": [{"type": "boolean"}, {"type": "null"}],
+                            "description": "from Field",
+                        },
+                        {"type": "null"},
+                    ],
+                    "default": None,
+                }
+            }
+        )
+        _sanitize_schema_for_compatibility(tool)
+        assert tool.inputSchema["properties"]["foo"] == {
+            "type": "boolean",
+            "default": None,
+            "description": "from Field",
+        }
 
     def test_flattens_simple_nullable_integer(self) -> None:
         """``int | None`` → ``{"type": "integer"}``."""
@@ -355,3 +405,26 @@ class TestNarrowedParameterRegression:
         csv = "./file1.pdf, ./file2.png"
         result = [p.strip() for p in csv.split(",") if p.strip()]
         assert result == ["./file1.pdf", "./file2.png"]
+
+
+@pytest.mark.anyio
+async def test_wire_schemas_match_sanitized_schemas(
+    all_tool_schemas: dict[str, dict], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """tools/list over a real client session serves exactly the schemas these
+    tests check, so the production middleware path is covered too."""
+    from fastmcp import Client
+
+    monkeypatch.setenv("JIRA_URL", "https://example.atlassian.net")
+    monkeypatch.setenv("JIRA_USERNAME", "user@example.com")
+    monkeypatch.setenv("JIRA_API_TOKEN", "x")
+    monkeypatch.setenv("CONFLUENCE_URL", "https://example.atlassian.net/wiki")
+    monkeypatch.setenv("CONFLUENCE_USERNAME", "user@example.com")
+    monkeypatch.setenv("CONFLUENCE_API_TOKEN", "x")
+    for var in ("READ_ONLY_MODE", "ENABLED_TOOLS", "TOOLSETS"):
+        monkeypatch.delenv(var, raising=False)
+
+    async with Client(main_mcp) as client:
+        wire = {tool.name: tool.inputSchema for tool in await client.list_tools()}
+
+    assert wire == all_tool_schemas
