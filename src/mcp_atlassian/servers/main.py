@@ -398,6 +398,21 @@ class AtlassianMCP(FastMCP[MainAppContext]):
         allowed_hosts: list[str] | None = None,
         allowed_origins: list[str] | None = None,
     ) -> StarletteWithLifespan:
+        """Build the HTTP app with UserTokenMiddleware ahead of any caller middleware.
+
+        Every other argument passes straight through to ``FastMCP.http_app``.
+        The Host/Origin guard arguments default to fastmcp's settings
+        (``FASTMCP_HTTP_HOST_ORIGIN_PROTECTION``, ``FASTMCP_HTTP_ALLOWED_HOSTS``),
+        which leave the guard off.
+
+        Args:
+            host_origin_protection: ``True`` rejects requests whose Host is not
+                allowed (421) or whose Origin is untrusted (403); ``"auto"``
+                does so only for loopback-bound servers or explicit allowlists;
+                ``False`` disables the guard.
+            allowed_hosts: Extra Host patterns the guard accepts.
+            allowed_origins: Extra browser origins the guard accepts.
+        """
         final_path = path
         if transport == "streamable-http":
             configured_path = path or fastmcp_settings.streamable_http_path
