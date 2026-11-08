@@ -6,7 +6,8 @@ import os
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastmcp import Context
+from fastmcp import Client, Context
+from fastmcp.exceptions import NotFoundError
 from fastmcp.tools import Tool as FastMCPTool
 from mcp.types import Tool as MCPTool
 from starlette.applications import Starlette
@@ -31,6 +32,16 @@ from tests.utils.factories import (
 from tests.utils.mocks import MockEnvironment
 
 logger = logging.getLogger(__name__)
+
+
+async def _list_tools(server: AtlassianMCP) -> list[FastMCPTool]:
+    """Run the tools/list filter over the test's stubbed ``tool_registry``."""
+    tools = await server.tool_registry()
+    for name, tool in tools.items():
+        tool.name = name
+        tool.parameters = {}
+        tool.model_copy.return_value = tool
+    return await server.filter_listed_tools(list(tools.values()))
 
 
 @pytest.mark.anyio
@@ -96,16 +107,11 @@ class TestMCPProtocolIntegration:
     ):
         """A tool filtered out of the listing must not be invocable by name.
 
-        `_list_tools_mcp` hides read-only-excluded / non-enabled / disabled-toolset
-        tools, but the call path must re-check — otherwise a client can dispatch a
-        hidden tool directly by name. Verifies denied calls never reach the
-        underlying executor and enabled calls do (GHSA-3r68).
+        The tools/list filter hides read-only-excluded / non-enabled /
+        disabled-toolset tools, but the call path must re-check — otherwise a
+        client can dispatch a hidden tool directly by name. Verifies denied calls
+        are refused and enabled calls pass the gate (GHSA-3r68).
         """
-        from unittest.mock import AsyncMock
-
-        from fastmcp import FastMCP
-        from fastmcp.exceptions import NotFoundError
-
         app_context = MainAppContext(
             full_jira_config=mock_jira_config,
             full_confluence_config=mock_confluence_config,
@@ -118,29 +124,23 @@ class TestMCPProtocolIntegration:
         atlassian_mcp_server._mcp_server = MagicMock()
         atlassian_mcp_server._mcp_server.request_context = request_context
 
-        async def mock_get_tools():
-            read_tool = MagicMock(spec=FastMCPTool)
-            read_tool.tags = {"jira", "read"}
-            write_tool = MagicMock(spec=FastMCPTool)
-            write_tool.tags = {"jira", "write"}
-            return {"jira_get_issue": read_tool, "jira_create_issue": write_tool}
+        read_tool = MagicMock(spec=FastMCPTool)
+        read_tool.tags = {"jira", "read"}
+        write_tool = MagicMock(spec=FastMCPTool)
+        write_tool.tags = {"jira", "write"}
+        registry = {"jira_get_issue": read_tool, "jira_create_issue": write_tool}
 
-        atlassian_mcp_server.get_tools = mock_get_tools
+        async def mock_get_tool(name: str) -> FastMCPTool | None:
+            return registry.get(name)
 
-        with patch.object(
-            FastMCP, "_call_tool_mcp", new_callable=AsyncMock
-        ) as mock_super:
-            mock_super.return_value = "EXECUTED"
+        atlassian_mcp_server.get_tool = mock_get_tool
 
-            # Write tool is read-only-excluded -> denied before reaching the executor.
-            with pytest.raises(NotFoundError):
-                await atlassian_mcp_server._call_tool_mcp("jira_create_issue", {})
-            mock_super.assert_not_called()
+        # Write tool is read-only-excluded -> denied.
+        with pytest.raises(NotFoundError):
+            await atlassian_mcp_server.authorize_tool_call("jira_create_issue")
 
-            # Read tool is enabled -> passes the gate and reaches the executor.
-            result = await atlassian_mcp_server._call_tool_mcp("jira_get_issue", {})
-            assert result == "EXECUTED"
-            mock_super.assert_called_once()
+        # Read tool is enabled -> passes the gate.
+        await atlassian_mcp_server.authorize_tool_call("jira_get_issue")
 
     async def test_tool_discovery_with_full_configuration(
         self, atlassian_mcp_server, mock_jira_config, mock_confluence_config
@@ -174,7 +174,7 @@ class TestMCPProtocolIntegration:
                 atlassian_mcp_server._mcp_server = MagicMock()
                 atlassian_mcp_server._mcp_server.request_context = request_context
 
-                # Mock get_tools to return sample tools
+                # Stub the tool registry to return sample tools
                 async def mock_get_tools():
                     tools = {}
                     # Add sample Jira tools
@@ -213,10 +213,10 @@ class TestMCPProtocolIntegration:
 
                     return tools
 
-                atlassian_mcp_server.get_tools = mock_get_tools
+                atlassian_mcp_server.tool_registry = mock_get_tools
 
                 # Get filtered tools
-                tools = await atlassian_mcp_server._list_tools_mcp()
+                tools = await _list_tools(atlassian_mcp_server)
 
                 # Assert all tools are available
                 tool_names = [tool.name for tool in tools]
@@ -248,7 +248,7 @@ class TestMCPProtocolIntegration:
             atlassian_mcp_server._mcp_server = MagicMock()
             atlassian_mcp_server._mcp_server.request_context = request_context
 
-            # Mock get_tools
+            # Stub the tool registry
             async def mock_get_tools():
                 tools = {}
                 # Add mix of read and write tools
@@ -293,10 +293,10 @@ class TestMCPProtocolIntegration:
 
                 return tools
 
-            atlassian_mcp_server.get_tools = mock_get_tools
+            atlassian_mcp_server.tool_registry = mock_get_tools
 
             # Get filtered tools
-            tools = await atlassian_mcp_server._list_tools_mcp()
+            tools = await _list_tools(atlassian_mcp_server)
 
             # Assert only read tools are available
             tool_names = [tool.name for tool in tools]
@@ -330,7 +330,7 @@ class TestMCPProtocolIntegration:
             atlassian_mcp_server._mcp_server = MagicMock()
             atlassian_mcp_server._mcp_server.request_context = request_context
 
-            # Mock get_tools
+            # Stub the tool registry
             async def mock_get_tools():
                 tools = {}
                 all_tools = [
@@ -364,10 +364,10 @@ class TestMCPProtocolIntegration:
 
                 return tools
 
-            atlassian_mcp_server.get_tools = mock_get_tools
+            atlassian_mcp_server.tool_registry = mock_get_tools
 
             # Get filtered tools
-            tools = await atlassian_mcp_server._list_tools_mcp()
+            tools = await _list_tools(atlassian_mcp_server)
 
             # Assert only enabled tools are available
             tool_names = [tool.name for tool in tools]
@@ -399,7 +399,7 @@ class TestMCPProtocolIntegration:
             atlassian_mcp_server._mcp_server = MagicMock()
             atlassian_mcp_server._mcp_server.request_context = request_context
 
-            # Mock get_tools
+            # Stub the tool registry
             async def mock_get_tools():
                 tools = {}
                 all_tools = [
@@ -432,10 +432,10 @@ class TestMCPProtocolIntegration:
 
                 return tools
 
-            atlassian_mcp_server.get_tools = mock_get_tools
+            atlassian_mcp_server.tool_registry = mock_get_tools
 
             # Get filtered tools
-            tools = await atlassian_mcp_server._list_tools_mcp()
+            tools = await _list_tools(atlassian_mcp_server)
 
             # Assert no tools are available when services not configured
             assert len(tools) == 0
@@ -948,7 +948,7 @@ class TestMCPProtocolIntegration:
             atlassian_mcp_server._mcp_server = MagicMock()
             atlassian_mcp_server._mcp_server.request_context = request_context
 
-            # Mock get_tools
+            # Stub the tool registry
             async def mock_get_tools():
                 tools = {}
                 tool_configs = [
@@ -976,10 +976,10 @@ class TestMCPProtocolIntegration:
 
                 return tools
 
-            atlassian_mcp_server.get_tools = mock_get_tools
+            atlassian_mcp_server.tool_registry = mock_get_tools
 
             # Get filtered tools
-            tools = await atlassian_mcp_server._list_tools_mcp()
+            tools = await _list_tools(atlassian_mcp_server)
 
             # Only jira_get_issue should pass all filters
             tool_names = [tool.name for tool in tools]
@@ -991,17 +991,21 @@ class TestMCPProtocolIntegration:
         atlassian_mcp_server._mcp_server = MagicMock()
         atlassian_mcp_server._mcp_server.request_context = None
 
-        # Mock get_tools (shouldn't be called)
-        async def mock_get_tools():
-            pytest.fail("get_tools should not be called when context is missing")
+        # The tool lookup shouldn't be reached
+        async def mock_get_tool(*args: object) -> None:
+            pytest.fail("get_tool should not be called when context is missing")
 
-        atlassian_mcp_server.get_tools = mock_get_tools
+        atlassian_mcp_server.get_tool = mock_get_tool
 
-        # Get filtered tools
-        tools = await atlassian_mcp_server._list_tools_mcp()
+        # Listing hides everything
+        read_tool = MagicMock(spec=FastMCPTool)
+        read_tool.name = "jira_get_issue"
+        read_tool.tags = {"jira", "read"}
+        assert await atlassian_mcp_server.filter_listed_tools([read_tool]) == []
 
-        # Should return empty list
-        assert tools == []
+        # Calls fail closed, even for a read tool
+        with pytest.raises(NotFoundError):
+            await atlassian_mcp_server.authorize_tool_call("jira_get_issue")
 
     async def test_http_app_middleware_integration(self, atlassian_mcp_server):
         """Test HTTP app creation with custom middleware."""
@@ -1066,9 +1070,9 @@ class TestMCPProtocolIntegration:
                     tools[tool_name] = tool
                 return tools
 
-            atlassian_mcp_server.get_tools = mock_get_tools
+            atlassian_mcp_server.tool_registry = mock_get_tools
 
-            tools = await atlassian_mcp_server._list_tools_mcp()
+            tools = await _list_tools(atlassian_mcp_server)
 
             tool_names = [tool.name for tool in tools]
             assert "jira_get_issue" in tool_names
@@ -1114,9 +1118,9 @@ class TestMCPProtocolIntegration:
                     tools[tool_name] = tool
                 return tools
 
-            atlassian_mcp_server.get_tools = mock_get_tools
+            atlassian_mcp_server.tool_registry = mock_get_tools
 
-            tools = await atlassian_mcp_server._list_tools_mcp()
+            tools = await _list_tools(atlassian_mcp_server)
 
             # Only jira_get_issue and jira_search_issues pass both filters
             # jira_get_agile_boards passes toolsets but not enabled_tools
@@ -1163,9 +1167,9 @@ class TestMCPProtocolIntegration:
                     tools[tool_name] = tool
                 return tools
 
-            atlassian_mcp_server.get_tools = mock_get_tools
+            atlassian_mcp_server.tool_registry = mock_get_tools
 
-            tools = await atlassian_mcp_server._list_tools_mcp()
+            tools = await _list_tools(atlassian_mcp_server)
 
             # jira_get_issue: passes toolset + read → included
             # jira_create_issue: passes toolset but blocked by read_only → excluded
@@ -1215,9 +1219,9 @@ class TestMCPProtocolIntegration:
                     tools[tool_name] = tool
                 return tools
 
-            atlassian_mcp_server.get_tools = mock_get_tools
+            atlassian_mcp_server.tool_registry = mock_get_tools
 
-            tools = await atlassian_mcp_server._list_tools_mcp()
+            tools = await _list_tools(atlassian_mcp_server)
 
             # Only default toolset tools pass — jira_agile is not default
             tool_names = [tool.name for tool in tools]
@@ -1283,3 +1287,67 @@ class TestMCPProtocolIntegration:
         # Execute tool and verify error handling
         with pytest.raises(MCPAtlassianAuthenticationError):
             await mock_failing_tool(ctx)
+
+
+@pytest.mark.anyio
+@pytest.mark.security_regression
+class TestToolFilterMiddlewareEndToEnd:
+    """Exercise the tool filter through a real in-process MCP client session,
+    so the boundaries are tested on the path requests actually take."""
+
+    @pytest.fixture(autouse=True)
+    def _cloud_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        for service in ("JIRA", "CONFLUENCE"):
+            monkeypatch.delenv(f"{service}_PERSONAL_TOKEN", raising=False)
+        monkeypatch.setenv("JIRA_URL", "https://example.atlassian.net")
+        monkeypatch.setenv("JIRA_USERNAME", "user@example.com")
+        monkeypatch.setenv("JIRA_API_TOKEN", "x")
+        monkeypatch.setenv("CONFLUENCE_URL", "https://example.atlassian.net/wiki")
+        monkeypatch.setenv("CONFLUENCE_USERNAME", "user@example.com")
+        monkeypatch.setenv("CONFLUENCE_API_TOKEN", "x")
+        for var in ("READ_ONLY_MODE", "ENABLED_TOOLS", "TOOLSETS"):
+            monkeypatch.delenv(var, raising=False)
+
+    async def _session_view(self) -> tuple[set[str], dict[str, str]]:
+        from mcp_atlassian.servers.main import main_mcp
+
+        outcomes: dict[str, str] = {}
+        async with Client(main_mcp) as client:
+            listed = {tool.name for tool in await client.list_tools()}
+            for name in ("jira_create_issue", "confluence_create_page"):
+                result = await client.call_tool(name, {}, raise_on_error=False)
+                text = result.content[0].text if result.content else ""
+                outcomes[name] = "denied" if "Unknown tool" in text else "dispatched"
+        return listed, outcomes
+
+    async def test_unfiltered_session_dispatches_write_tools(self) -> None:
+        listed, outcomes = await self._session_view()
+        assert {"jira_create_issue", "confluence_create_page"} <= listed
+        assert outcomes == {
+            "jira_create_issue": "dispatched",
+            "confluence_create_page": "dispatched",
+        }
+
+    async def test_read_only_mode_hides_and_denies_write_tools(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("READ_ONLY_MODE", "true")
+        listed, outcomes = await self._session_view()
+        assert "jira_get_issue" in listed
+        assert "jira_create_issue" not in listed
+        assert "confluence_create_page" not in listed
+        assert outcomes == {
+            "jira_create_issue": "denied",
+            "confluence_create_page": "denied",
+        }
+
+    async def test_enabled_tools_allowlist_hides_and_denies_others(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("ENABLED_TOOLS", "jira_get_issue,jira_create_issue")
+        listed, outcomes = await self._session_view()
+        assert listed == {"jira_get_issue", "jira_create_issue"}
+        assert outcomes == {
+            "jira_create_issue": "dispatched",
+            "confluence_create_page": "denied",
+        }

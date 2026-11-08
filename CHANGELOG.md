@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Upgraded locked dependencies within their declared ranges to clear the
   advisories the fleet dependency audit found (26 of 28 flagged packages; fastmcp 2.14 needs a 3.2 port and diskcache has no fixed release).
+- Ported to fastmcp 3.2 (PYSEC-2026-2475, PYSEC-2026-2476). This also drops
+  diskcache (PYSEC-2026-2447), which only fastmcp 2.x pulled in (#24).
+- Tool enablement (read-only mode, `ENABLED_TOOLS`, toolsets) is now enforced
+  by fastmcp middleware on every tools/list and tools/call path. A call with no
+  lifespan context is refused, not allowed through.
 
 ### Added
 
@@ -25,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Tool input schemas now declare `additionalProperties: false`. The server
+  already rejected unknown arguments; fastmcp 3 now says so in the schema.
+  Tool names, parameters and tags are unchanged. Tags moved from
+  `meta._fastmcp` to `meta.fastmcp`.
 - Container base images pinned to `quay.io/hummingbird/python:3.14*` instead of
   `latest`, which moved to Python 3.15.0 on 2026-10-20 (crunchtools/constitution#66).
 - Per-repo constitution is now a v1.18.0 manifest: only fork-specific facts
