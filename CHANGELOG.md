@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- Upstream's PyPI publish workflow. It ran on every fork release and would
+  publish to upstream's `mcp-atlassian` package name; the fork ships only the
+  Quay.io image.
+
 ## [0.22.2] - 2026-11-08
 
 First Crunchtools fork release, on upstream v0.22.1.

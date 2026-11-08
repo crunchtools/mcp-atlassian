@@ -1,8 +1,8 @@
 # mcp-atlassian Constitution
 
-> **Version:** 1.2.0
+> **Version:** 1.3.0
 > **Ratified:** 2026-09-20
-> **Amended:** 2026-10-02
+> **Amended:** 2026-11-08
 > **Status:** Active
 > **Inherits:** [crunchtools/constitution](https://github.com/crunchtools/constitution) v1.29.0
 > **Profile:** Forked MCP Server
@@ -32,6 +32,7 @@ are not restated here.
 - Security hardening across the attachment, transport, SSRF, authorization, filter and OAuth layers
 - Proxy routing preserved for trusted transports
 - Rate-limit tests made deterministic against a shared bucket
+- Upstream's PyPI publish workflow removed: the fork does not own PyPI publishing, and the package name is upstream's
 
 ## History
 
@@ -40,3 +41,4 @@ are not restated here.
 | 1.0.0 | 2026-09-20 | Forked MCP Server profile declared |
 | 1.1.0 | 2026-09-25 | Gourmand gates the crunchtools delta (RT #1511) |
 | 1.2.0 | 2026-10-02 | Manifest under constitution v1.18.0: Registry and Quality Gates restatements removed |
+| 1.3.0 | 2026-11-08 | Patches: upstream PyPI publish workflow removed |
