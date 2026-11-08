@@ -9,10 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.2] - 2026-11-08
+
+First Crunchtools fork release, on upstream v0.22.1.
+
 ### Security
 
 - Upgraded locked dependencies within their declared ranges to clear the
-  advisories the fleet dependency audit found (26 of 28 flagged packages; fastmcp 2.14 needs a 3.2 port and diskcache has no fixed release).
+  advisories the fleet dependency audit found (26 of 28 flagged packages).
 - Ported to fastmcp 3.4 (PYSEC-2026-2475, PYSEC-2026-2476, GHSA-7xgj-8392-5q4r).
   This also drops diskcache (PYSEC-2026-2447), which only fastmcp 2.x pulled
   in (#24).
@@ -42,3 +46,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Constitution validation pinned to v1.18.0 via `constitution.yml`.
 - Dependabot auto-merges GitHub Actions minor and patch updates.
 - Synced with upstream v0.22.1.
+
+[Unreleased]: https://github.com/crunchtools/mcp-atlassian/compare/v0.22.2...HEAD
+[0.22.2]: https://github.com/crunchtools/mcp-atlassian/releases/tag/v0.22.2
