@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The container installed dependencies with `pip install .`, which reads only
+  `pyproject.toml`'s floor-pins and resolves a fresh set at build time instead
+  of the committed, Dependabot-maintained `uv.lock`. CI tests the locked
+  versions; the shipped image could silently drift to different ones. The
+  builder now exports `uv.lock` to a requirements file in a dedicated stage
+  and installs both it and the project with `--no-deps`, so the image ships
+  exactly what CI tested (RT #1564).
+
 ### Removed
 
 - Upstream's PyPI publish workflow. It ran on every fork release and would
