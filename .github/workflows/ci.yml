@@ -5,6 +5,7 @@
 # NOT every check on this pull request: Gourmand and Gatehouse run as their own
 # workflows, which is why `sdlc ci` leaves them out (XII: "CI runs push's checks
 # except Gourmand and Gatehouse, which CI runs through their own workflows").
+# The Gourmand job below is one of them.
 #
 # The job NAME `sdlc ci` is the required check in the org ruleset "Python SDLC
 # gates". Renaming the job stops it gating, silently.
@@ -39,3 +40,7 @@ jobs:
           [ -n "$rev" ] || { echo "no python-sdlc rev in .pre-commit-config.yaml" >&2; exit 2; }
           git clone -q --depth 1 --branch "$rev" https://github.com/crunchtools/python-sdlc "$RUNNER_TEMP/sdlc"
           $RUNNER_TEMP/sdlc/bin/sdlc ci
+
+  gourmand:
+    name: Code Quality (Gourmand)
+    uses: crunchtools/gatehouse/.github/workflows/gourmand.yml@v0
