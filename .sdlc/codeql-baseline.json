@@ -1,0 +1,132 @@
+[
+  {
+    "rule": "py/clear-text-logging-sensitive-data",
+    "path": "src/mcp_atlassian/confluence/attachments.py",
+    "fingerprint": "47b4d7369ae192d5:1"
+  },
+  {
+    "rule": "py/clear-text-logging-sensitive-data",
+    "path": "src/mcp_atlassian/confluence/attachments.py",
+    "fingerprint": "94fbf9ae877b045c:1"
+  },
+  {
+    "rule": "py/clear-text-logging-sensitive-data",
+    "path": "src/mcp_atlassian/confluence/attachments.py",
+    "fingerprint": "9fed07ccc69b4866:1"
+  },
+  {
+    "rule": "py/clear-text-logging-sensitive-data",
+    "path": "src/mcp_atlassian/confluence/attachments.py",
+    "fingerprint": "b39b700acc86c2cd:1"
+  },
+  {
+    "rule": "py/clear-text-logging-sensitive-data",
+    "path": "src/mcp_atlassian/confluence/attachments.py",
+    "fingerprint": "edf63292f2f712a6:1"
+  },
+  {
+    "rule": "py/clear-text-logging-sensitive-data",
+    "path": "src/mcp_atlassian/jira/attachments.py",
+    "fingerprint": "7136855f5786fc59:1"
+  },
+  {
+    "rule": "py/clear-text-logging-sensitive-data",
+    "path": "src/mcp_atlassian/jira/attachments.py",
+    "fingerprint": "83df907bf9c181ce:1"
+  },
+  {
+    "rule": "py/clear-text-logging-sensitive-data",
+    "path": "src/mcp_atlassian/jira/attachments.py",
+    "fingerprint": "9fed07ccc69b4866:1"
+  },
+  {
+    "rule": "py/clear-text-logging-sensitive-data",
+    "path": "src/mcp_atlassian/jira/attachments.py",
+    "fingerprint": "f833aef71e5fb52b:1"
+  },
+  {
+    "rule": "py/clear-text-logging-sensitive-data",
+    "path": "src/mcp_atlassian/servers/main.py",
+    "fingerprint": "f5f78aca3edc627e:1"
+  },
+  {
+    "rule": "py/incomplete-url-substring-sanitization",
+    "path": "tests/integration/test_ssl_verification.py",
+    "fingerprint": "1833e0d71fa586fc:1"
+  },
+  {
+    "rule": "py/incomplete-url-substring-sanitization",
+    "path": "tests/integration/test_ssl_verification.py",
+    "fingerprint": "a3e7588829165ded:1"
+  },
+  {
+    "rule": "py/incomplete-url-substring-sanitization",
+    "path": "tests/integration/test_ssl_verification.py",
+    "fingerprint": "f10c3be20e47a362:1"
+  },
+  {
+    "rule": "py/incomplete-url-substring-sanitization",
+    "path": "tests/unit/preprocessing/test_preprocessing.py",
+    "fingerprint": "51f38de9d5362f36:1"
+  },
+  {
+    "rule": "py/incomplete-url-substring-sanitization",
+    "path": "tests/unit/preprocessing/test_preprocessing.py",
+    "fingerprint": "667c079d23bd9edc:1"
+  },
+  {
+    "rule": "py/incomplete-url-substring-sanitization",
+    "path": "tests/unit/preprocessing/test_preprocessing.py",
+    "fingerprint": "8f95c38290fb23c1:1"
+  },
+  {
+    "rule": "py/incomplete-url-substring-sanitization",
+    "path": "tests/unit/utils/test_proxy.py",
+    "fingerprint": "b63ee9496504eeae:1"
+  },
+  {
+    "rule": "py/incomplete-url-substring-sanitization",
+    "path": "tests/unit/utils/test_ssl.py",
+    "fingerprint": "384bdd0c6ee28132:1"
+  },
+  {
+    "rule": "py/incomplete-url-substring-sanitization",
+    "path": "tests/unit/utils/test_ssl.py",
+    "fingerprint": "c3b7f6c1cfa6c97e:1"
+  },
+  {
+    "rule": "py/jinja2/autoescape-false",
+    "path": "scripts/generate_tool_docs.py",
+    "fingerprint": "ed5fb4bb0e044c1f:1"
+  },
+  {
+    "rule": "py/log-injection",
+    "path": "scripts/oauth_authorize.py",
+    "fingerprint": "3e68665b26eb855e:1"
+  },
+  {
+    "rule": "py/log-injection",
+    "path": "scripts/oauth_authorize.py",
+    "fingerprint": "6a700d9b9f722b0d:1"
+  },
+  {
+    "rule": "py/log-injection",
+    "path": "scripts/oauth_authorize.py",
+    "fingerprint": "8c5ac56c105b7b05:1"
+  },
+  {
+    "rule": "py/log-injection",
+    "path": "scripts/oauth_authorize.py",
+    "fingerprint": "bb6c1307ae4bf3cf:1"
+  },
+  {
+    "rule": "py/log-injection",
+    "path": "scripts/oauth_authorize.py",
+    "fingerprint": "d5e12405cd997a87:1"
+  },
+  {
+    "rule": "py/log-injection",
+    "path": "src/mcp_atlassian/utils/oauth_setup.py",
+    "fingerprint": "bb6c1307ae4bf3cf:1"
+  }
+]

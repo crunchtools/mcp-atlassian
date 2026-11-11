@@ -274,7 +274,9 @@ def run_oauth_flow(args: argparse.Namespace) -> bool:
                 "\n💡 Tip: Add/update the following in your .env file or environment variables:"
             )
             logger.info(f"ATLASSIAN_OAUTH_CLIENT_ID={oauth_config.client_id}")
-            logger.info(f"ATLASSIAN_OAUTH_CLIENT_SECRET={oauth_config.client_secret}")
+            # Never echo the secret: logs and terminals outlive the session.
+            # The user supplied it to this script, so they already have it.
+            logger.info("ATLASSIAN_OAUTH_CLIENT_SECRET=<the client secret you entered>")
             logger.info(f"ATLASSIAN_OAUTH_REDIRECT_URI={oauth_config.redirect_uri}")
             logger.info(f"ATLASSIAN_OAUTH_SCOPE={oauth_config.scope}")
             logger.info(f"ATLASSIAN_OAUTH_CLOUD_ID={oauth_config.cloud_id}")
