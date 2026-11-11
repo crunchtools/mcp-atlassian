@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.3] - 2026-11-11
+
 ### Fixed
 
 - The container installed dependencies with `pip install .`, which reads only
@@ -63,5 +65,6 @@ First Crunchtools fork release, on upstream v0.22.1.
 - Dependabot auto-merges GitHub Actions minor and patch updates.
 - Synced with upstream v0.22.1.
 
-[Unreleased]: https://github.com/crunchtools/mcp-atlassian/compare/v0.22.2...HEAD
+[Unreleased]: https://github.com/crunchtools/mcp-atlassian/compare/v0.22.3...HEAD
+[0.22.3]: https://github.com/crunchtools/mcp-atlassian/releases/tag/v0.22.3
 [0.22.2]: https://github.com/crunchtools/mcp-atlassian/releases/tag/v0.22.2
