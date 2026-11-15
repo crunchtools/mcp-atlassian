@@ -215,3 +215,10 @@ DEFAULT_READ_JIRA_FIELDS: set[str] = {
     "updated",
     "issuetype",
 }
+
+# The same fields as one comma-separated string, SORTED. Joining the set
+# directly gives an order that changes with every process (string hashing is
+# randomized), so a tool's published default -- and therefore its schema --
+# changed on every restart, and gateways that pin tool definitions held the
+# Jira tools again each time.
+DEFAULT_READ_JIRA_FIELDS_CSV: str = ",".join(sorted(DEFAULT_READ_JIRA_FIELDS))

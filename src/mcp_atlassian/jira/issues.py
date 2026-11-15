@@ -15,7 +15,7 @@ from ..models.jira.adf import merge_adf_with_preserved_media
 from ..models.jira.common import JiraChangelog
 from ..utils import parse_date
 from .client import JiraClient
-from .constants import DEFAULT_READ_JIRA_FIELDS
+from .constants import DEFAULT_READ_JIRA_FIELDS, DEFAULT_READ_JIRA_FIELDS_CSV
 from .protocols import (
     AttachmentsOperationsProto,
     EpicOperationsProto,
@@ -125,7 +125,7 @@ class IssuesMixin(
             # Determine fields_param: use provided fields or default from constant
             fields_param = fields
             if fields_param is None:
-                fields_param = ",".join(DEFAULT_READ_JIRA_FIELDS)
+                fields_param = DEFAULT_READ_JIRA_FIELDS_CSV
             elif isinstance(fields_param, list | tuple | set):
                 fields_param = ",".join(fields_param)
 
@@ -138,7 +138,7 @@ class IssuesMixin(
                 default_fields_list = (
                     fields_param.split(",")
                     if fields_param != "*all"
-                    else list(DEFAULT_READ_JIRA_FIELDS)
+                    else sorted(DEFAULT_READ_JIRA_FIELDS)
                 )
                 additional_fields = []
 

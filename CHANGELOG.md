@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.4] - 2026-11-14
+
+### Fixed
+- Jira tools' default `fields` value is now a sorted string. It was joined
+  from a set, so its order changed with every process; each restart published
+  a new tool schema, and gateways that pin tool definitions held the Jira
+  tools again until an operator re-approved them.
+
 ## [0.22.3] - 2026-11-11
 
 ### Fixed
