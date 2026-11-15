@@ -3,7 +3,10 @@
 Focused tests for Jira constants, validating correct values and business logic.
 """
 
-from mcp_atlassian.jira.constants import DEFAULT_READ_JIRA_FIELDS
+from mcp_atlassian.jira.constants import (
+    DEFAULT_READ_JIRA_FIELDS,
+    DEFAULT_READ_JIRA_FIELDS_CSV,
+)
 
 
 class TestDefaultReadJiraFields:
@@ -45,3 +48,30 @@ class TestDefaultReadJiraFields:
             assert " " not in field
             assert not field.startswith("_")
             assert not field.endswith("_")
+
+    def test_csv_is_sorted_and_complete(self):
+        """The published default must not depend on set iteration order."""
+        assert DEFAULT_READ_JIRA_FIELDS_CSV == ",".join(
+            sorted(DEFAULT_READ_JIRA_FIELDS)
+        )
+        assert set(DEFAULT_READ_JIRA_FIELDS_CSV.split(",")) == DEFAULT_READ_JIRA_FIELDS
+
+
+def test_tool_defaults_are_stable_across_processes():
+    """Two interpreters with different hash seeds publish the same default."""
+    import os
+    import subprocess
+    import sys
+
+    code = "from mcp_atlassian.jira.constants import DEFAULT_READ_JIRA_FIELDS_CSV as c; print(c)"
+    outputs = {
+        subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            check=True,
+            env={**os.environ, "PYTHONHASHSEED": seed},
+        ).stdout
+        for seed in ("1", "2", "3")
+    }
+    assert len(outputs) == 1
