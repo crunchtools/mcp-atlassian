@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Gatehouse triage passes `review_result: ${{ needs.review.result }}`, so a PR
+  whose review job died before posting is held instead of passing (constitution
+  v1.52.0 XII Triage, gatehouse#161).
+
 ### Changed
 - Promote signs the image with the fleet cosign key (`sign: true`), because
   bootc hosts are moving to trust only signed `quay.io/crunchtools` images
