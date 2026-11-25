@@ -193,3 +193,10 @@ skip = ["semgrep"]
 
 [tool.sdlc]
 repo-kinds = ["forked-mcp-server"]
+
+[tool.sdlc.image]
+# Written by crunchtools/sdlc's scripts/convert_repo.py: moved from the workflows.
+image = "quay.io/crunchtools/mcp-atlassian"
+boot = "mcp"
+boot-cmd = "--transport stdio"
+boot-env = "JIRA_URL=https://jira.invalid\nJIRA_PERSONAL_TOKEN=gate-dummy\nCONFLUENCE_URL=https://wiki.invalid\nCONFLUENCE_PERSONAL_TOKEN=gate-dummy\n"
