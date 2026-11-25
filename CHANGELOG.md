@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   promoted by its `image` and `promote` jobs from `[tool.sdlc.image]`, and the
   `stacks` key puts the Containerfile under the gates. The signing and
   `container-release.yml` entries below describe the workflows this replaces.
+- The version is static in `pyproject.toml` (`0.22.4`), moved by each release
+  PR. It came from git tags through `uv-dynamic-versioning`, but the image
+  builds without `.git`, so the installed package said `0.0.0` and the
+  container scan matched every upstream advisory against it.
 - Promote signs the image with the fleet cosign key (`sign: true`), because
   bootc hosts are moving to trust only signed `quay.io/crunchtools` images
   (crunchtools/rhel10-bootc-server#47). Needs the repo's `cosign-signing`
