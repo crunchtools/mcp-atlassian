@@ -193,6 +193,9 @@ skip = ["semgrep"]
 
 [tool.sdlc]
 repo-kinds = ["forked-mcp-server"]
+# A Python repo naming no stacks runs python alone, and then `sdlc plan ci` has
+# no container-build for the image job to build the Containerfile with.
+stacks = ["python", "container"]
 
 [tool.sdlc.image]
 # Written by crunchtools/sdlc's scripts/convert_repo.py: moved from the workflows.
