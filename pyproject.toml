@@ -1,6 +1,6 @@
 [project]
 name = "mcp-atlassian"
-dynamic = ["version"]
+version = "0.22.4"
 description = "The Model Context Protocol (MCP) Atlassian integration is an open-source implementation that bridges Atlassian products (Jira and Confluence) with AI language models following Anthropic's MCP specification. This project enables secure, contextual AI interactions with Atlassian tools while maintaining data privacy and security. Key features include:"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -37,7 +37,7 @@ name = "sooperset"
 email = "soomiles.dev@gmail.com"
 
 [build-system]
-requires = ["hatchling", "uv-dynamic-versioning>=0.7.0"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project.scripts]
@@ -177,15 +177,6 @@ ignore_missing_imports = true
 module = "src.mcp_atlassian.*"
 disallow_untyped_defs = false
 
-[tool.hatch.version]
-source = "uv-dynamic-versioning"
-
-[tool.uv-dynamic-versioning]
-vcs = "git"
-style = "pep440"
-bump = true
-fallback-version = "0.0.0"
-
 [tool.sdlc.push]
 # No in-repo Semgrep rules: the check exits 2 when .semgrep is absent
 # rather than scanning nothing and calling it a pass.
@@ -193,3 +184,13 @@ skip = ["semgrep"]
 
 [tool.sdlc]
 repo-kinds = ["forked-mcp-server"]
+# A Python repo naming no stacks runs python alone, and then `sdlc plan ci` has
+# no container-build for the image job to build the Containerfile with.
+stacks = ["python", "container"]
+
+[tool.sdlc.image]
+# Written by crunchtools/sdlc's scripts/convert_repo.py: moved from the workflows.
+image = "quay.io/crunchtools/mcp-atlassian"
+boot = "mcp"
+boot-cmd = "--transport stdio"
+boot-env = "JIRA_URL=https://jira.invalid\nJIRA_PERSONAL_TOKEN=gate-dummy\nCONFLUENCE_URL=https://wiki.invalid\nCONFLUENCE_PERSONAL_TOKEN=gate-dummy\n"

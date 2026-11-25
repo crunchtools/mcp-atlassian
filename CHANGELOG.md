@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   v1.52.0 XII Triage, gatehouse#161).
 
 ### Changed
+- CI is the fleet's one `ci.yml` (sdlc 0.15), configured in `[tool.sdlc]`.
+  It replaces the Gatehouse, constitution, security, Ashigaru and container
+  workflows: the image is built, booted over MCP stdio, scanned, signed and
+  promoted by its `image` and `promote` jobs from `[tool.sdlc.image]`, and the
+  `stacks` key puts the Containerfile under the gates. The signing and
+  `container-release.yml` entries below describe the workflows this replaces.
+- The version is static in `pyproject.toml` (`0.22.4`), moved by each release
+  PR. It came from git tags through `uv-dynamic-versioning`, but the image
+  builds without `.git`, so the installed package said `0.0.0` and the
+  container scan matched every upstream advisory against it.
 - Promote signs the image with the fleet cosign key (`sign: true`), because
   bootc hosts are moving to trust only signed `quay.io/crunchtools` images
   (crunchtools/rhel10-bootc-server#47). Needs the repo's `cosign-signing`
@@ -24,6 +34,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   opens an issue instead of only warning. A `v*` promote now also refuses an
   image whose `version` label names a different release of this repo; this
   image sets none, and the one it inherits from Hummingbird is not compared.
+
+### Removed
+- The upstream `@claude` workflow (`claude.yml`). Nothing replaces it: the
+  fleet's `ai` job triages issues and reviews PRs but does not answer
+  `@claude` mentions.
+- The upstream stale-issue bot (`stale.yml`), and Dependabot with its
+  auto-merge; Renovate's org config covers updates.
 
 ## [0.22.4] - 2026-11-14
 
